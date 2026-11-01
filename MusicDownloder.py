@@ -37,7 +37,7 @@ def save_storage(data):
 
 storage = load_storage()
 
-# تنظیمات ضدبلاک قدرتمند برای عبور از محدودیت‌ها
+# تنظیمات ضدبلاک و بهینه برای هاست‌های ابری
 def get_ydl_opts(extra_opts=None):
     opts = {
         'noplaylist': True,
@@ -66,15 +66,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "✨ **به ربات حرفه‌ای دانلود موزیک و ویدیو خوش آمدید!** 🎵\n\n"
         "🌐 **امکانات جامع ربات:**\n"
         " 🎬 **ارسال لینک (یوتیوب، اینستاگرام، تیک‌تاک و...):** دانلود ویدیو همراه با دکمه **🎵 دانلود آهنگ**.\n"
-        " 🔍 **جستجوی خواننده/آهنگ:** دریافت لیست کامل آثار و دانلود آنی با کیفیت عالی (320kbps).\n\n"
+        " 🔍 **جستجوی خواننده/آهنگ:** دریافت لیست کامل آثار و دانلود آنی با بهترین کیفیت.\n\n"
         "👇 *لینک یا نام خواننده مورد نظرتان را بفرستید!*"
     )
     await update.message.reply_text(welcome_text, parse_mode="Markdown")
 
 # مدیریت پیام‌ها و لینک‌ها
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text.strip()
-    os.makedirs('downloads', exist_ok=True)
-
-    # حالت اول: اگر کاربر لینک فرستاد (دانلود ویدیو + دکمه آهنگ)
-    if text.startswith("http://") or text.startswith("
+async def handle_message(update: Update,
