@@ -39,7 +39,7 @@ def save_storage(data):
 
 storage = load_storage()
 
-# 🌐 سرور سبک برای جلوگیری از به خواب رفتن ربات در هاست Render (Keep-Alive)
+# 🌐 سرور Keep-Alive برای روشن ماندن ربات در Render
 class HealthCheckHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -52,22 +52,16 @@ def run_keep_alive():
     logger.info(f"Keep-Alive server running on port {port}")
     server.serve_forever()
 
-# تنظیمات پیشرفته و ضدبلاک yt-dlp
+# تنظیمات ضد بلاک و چند پلتفرمی yt-dlp
 def get_ydl_opts(extra_opts=None):
     opts = {
         'noplaylist': True,
         'quiet': True,
         'no_warnings': True,
         'geo_bypass': True,
-        'extractor_args': {
-            'youtube': {
-                'player_client': ['ios', 'mweb', 'android', 'web']
-            }
-        },
         'http_headers': {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.5',
         },
     }
     if extra_opts:
@@ -77,52 +71,46 @@ def get_ydl_opts(extra_opts=None):
 # دستور استارت
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     welcome_text = (
-        "✨ **به ربات هوشمند موسیقی خوش آمدید!** 🎵[span_3](start_span)[span_3](end_span)\n\n"
-        "🎧 **امکانات ربات:**\n"
-        " 🔗 **ارسال لینک (اینستاگرام، یوتیوب و...):** استخراج موزیک، نمایش کاور و دکمه‌های جستجو[span_4](start_span)[span_4](end_span).\n"
-        " 🔍 **ارسال نام خواننده / آهنگ:** دریافت لیست کامل آثار و دانلود آنی فایل صوتی[span_5](start_span)[span_5](end_span).\n\n"
-        "👇 *لینک یا نام آهنگ مورد نظرتان را بفرستید!*"
+        "✨ **به ربات هوشمند دانلود موزیک خوش آمدید!** 🎵\n\n"
+        "🎧 **راهنمای ربات:**\n"
+        " 🔗 **ارسال لینک:** استخراج اطلاعات اثر و دریافت دکمه دانلود موزیک.\n"
+        " 🔍 **جستجوی اسم خواننده/آهنگ:** ارسال نام برای دریافت لیست کامل و دانلود مستقیم موزیک.\n\n"
+        "👇 *همین حالا نام خواننده یا لینک مورد نظرتان را ارسال کنید!*"
     )
     await update.message.reply_text(welcome_text, parse_mode="Markdown")
 
-# مدیریت پیام‌ها و لینک‌ها
+# مدیریت پیام‌ها
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     os.makedirs('downloads', exist_ok=True)
 
-    # حالت اول: اگر کاربر لینک ارسال کرد (اینستاگرام، یوتیوب و غیره)
+    # حالت اول: اگر کاربر لینک ارسال کرد
     if text.startswith("http://") or text.startswith("https://"):
-        status_msg = await update.message.reply_text("🔍 در حال پردازش لینک و شناسایی موسیقی...")
+        status_msg = await update.message.reply_text("🔍 در حال شناسایی موزیک...")
         try:
             with yt_dlp.YoutubeDL(get_ydl_opts()) as ydl:
                 info = ydl.extract_info(text, download=False)
                 title = info.get('title', 'موزیک شناسایی شده')
-                uploader = info.get('uploader', 'هنرمند ناشناس')
                 webpage_url = info.get('webpage_url', text)
 
             uid = str(uuid.uuid4())[:8]
-            storage[uid] = {'url': webpage_url, 'title': title}
+            storage[uid] = {'query': title, 'url': webpage_url}
             save_storage(storage)
 
-            # طراحی دکمه‌ها دقیقاً مشابه WhatsMusicBot
             keyboard = [
                 [
                     InlineKeyboardButton("Google", url=f"https://www.google.com/search?q={title}"),
                     InlineKeyboardButton("YouTube Music", url=webpage_url),
                 ],
                 [
-                    InlineKeyboardButton("🎵 دانلود فایل صوتی کامل", callback_data=f"dl_{uid}")
-                ],
-                [
-                    InlineKeyboardButton("📄 متن ترانه", callback_data=f"lyrics_{uid}")
+                    InlineKeyboardButton("🎵 دانلود فایل صوتی", callback_data=f"dl_{uid}")
                 ]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
 
             caption_text = (
-                f"🎵 **{title}**\n"
-                f"👤 خواننده / کانال: {uploader}\n\n"
-                f"🔍 شناسایی شده توسط ربات | source[span_6](start_span)[span_6](end_span)"
+                f"🎵 **{title}**\n\n"
+                f"🔍 شناسایی شده توسط ربات | @whatsmusicbot_clone"
             )
 
             await status_msg.delete()
@@ -130,24 +118,24 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         except Exception as e:
             logger.error(e)
-            await status_msg.edit_text("❌ خطا در پردازش لینک ارسالی. لطفاً لینک معتبر بفرستید.")
-    
-    # حالت دوم: اگر کاربر نام خواننده یا آهنگ فرستاد (جستجوی سراسری)
+            await status_msg.edit_text("❌ خطا در پردازش لینک.")
+
+    # حالت دوم: جستجوی نام خواننده یا آهنگ (مثل ویدیو ارسال شده)
     else:
         status_msg = await update.message.reply_text(f"🔍 در حال جستجوی آثار برای: *{text}*...", parse_mode="Markdown")
         try:
-            search_queries = [f"ytsearch15:{text}", f"scsearch15:{text}"]
-            entries = []
-            
-            for sq in search_queries:
-                try:
-                    with yt_dlp.YoutubeDL(get_ydl_opts({'extract_flat': True})) as ydl:
-                        info = ydl.extract_info(sq, download=False)
-                        if info and 'entries' in info:
-                            entries.extend(info['entries'])
-                except Exception as sub_e:
-                    logger.error(f"Search query {sq} failed: {sub_e}")
-                    continue
+            # اولویت جستجو در ساندکلاد و یوتیوب برای موفقیت دانلود روی سرور ابری
+            search_query = f"scsearch15:{text}"
+            with yt_dlp.YoutubeDL(get_ydl_opts({'extract_flat': True})) as ydl:
+                info = ydl.extract_info(search_query, download=False)
+                entries = info.get('entries', [])
+
+            # اگر ساندکلاد نتیجه نداشت، یوتیوب سرچ میشه
+            if not entries:
+                search_query = f"ytsearch15:{text}"
+                with yt_dlp.YoutubeDL(get_ydl_opts({'extract_flat': True})) as ydl:
+                    info = ydl.extract_info(search_query, download=False)
+                    entries = info.get('entries', [])
 
             if not entries:
                 await status_msg.edit_text("❌ متأسفانه هیچ نتیجه‌ای پیدا نشد.")
@@ -156,113 +144,94 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             keyboard = []
             for entry in entries[:15]:
                 video_title = entry.get('title', 'آهنگ بدون عنوان')
-                video_id = entry.get('id', '')
-                if not video_id:
-                    continue
                 
-                button_text = f"🎵 {video_title[:38]}..." if len(video_title) > 38 else f"🎵 {video_title}"
-                keyboard.append([InlineKeyboardButton(button_text, callback_data=f"ytid_{video_id}")])
+                uid = str(uuid.uuid4())[:8]
+                storage[uid] = {'query': video_title, 'url': entry.get('url') or entry.get('webpage_url')}
+                save_storage(storage)
+
+                button_text = f"🎵 {video_title[:40]}..." if len(video_title) > 40 else f"🎵 {video_title}"
+                keyboard.append([InlineKeyboardButton(button_text, callback_data=f"dl_{uid}")])
 
             reply_markup = InlineKeyboardMarkup(keyboard)
-            await status_msg.edit_text("✨ **لیست نتایج آماده است:**\n👇 آهنگ مورد نظر خود را انتخاب کنید:", reply_markup=reply_markup, parse_mode="Markdown")
+            await status_msg.edit_text("✨ **نتایج جستجو:**\n👇 موزیک مورد نظر را جهت دانلود انتخاب کنید:", reply_markup=reply_markup, parse_mode="Markdown")
 
         except Exception as e:
             logger.error(e)
             await status_msg.edit_text("❌ خطایی در جستجو رخ داد.")
 
-# مدیریت دکمه‌های شیشه‌ای
+# مدیریت دکمه دانلود (استخراج از چند منبع برای دور زدن بلاکی Render)
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     data = query.data
 
-    # ۱. انتخاب آهنگ از لیست جستجو
-    if data.startswith("ytid_"):
-        video_id = data.replace("ytid_", "")
-        url = f"https://www.youtube.com/watch?v={video_id}"
-        
-        await query.message.reply_text("📥 در حال دانلود و ارسال فایل صوتی کامل...", parse_mode="Markdown")
-        
-        try:
-            os.makedirs('downloads', exist_ok=True)
-            audio_opts = get_ydl_opts({
-                'format': 'bestaudio[ext=m4a]/bestaudio/best',
-                'outtmpl': 'downloads/%(id)s.%(ext)s',
-            })
-            
-            with yt_dlp.YoutubeDL(audio_opts) as ydl:
-                info = ydl.extract_info(url, download=True)
-                title = info.get('title', 'موزیک')
-                audio_file = ydl.prepare_filename(info)
-
-            if os.path.exists(audio_file):
-                with open(audio_file, 'rb') as audio:
-                    await query.message.reply_audio(
-                        audio=audio,
-                        caption=f"🎵 **{title}**\n✨ دانلود شده با موفقیت[span_7](start_span)[span_7](end_span)",
-                        parse_mode="Markdown"
-                    )
-                os.remove(audio_file)
-            else:
-                await query.message.reply_text("❌ خطا در آماده‌سازی فایل صوتی.")
-
-        except Exception as e:
-            logger.error(e)
-            await query.message.reply_text("❌ خطا در دانلود فایل موسیقی.")
-
-    # ۲. دانلود آهنگِ زیر لینک‌های ارسالی
-    elif data.startswith("dl_"):
+    if data.startswith("dl_"):
         uid = data.replace("dl_", "")
         item = storage.get(uid)
         if not item:
-            await query.message.reply_text("❌ اطلاعات منقضی شده است. لطفاً لینک را دوباره بفرستید.")
+            await query.message.reply_text("❌ اطلاعات منقضی شده است. دوباره جستجو کنید.")
             return
 
-        url = item['url']
-        title = item['title']
-        await query.message.reply_text(f"📥 در حال دانلود فایل صوتی: *{title[:30]}*...", parse_mode="Markdown")
+        song_title = item['query']
+        target_url = item.get('url')
         
-        try:
-            os.makedirs('downloads', exist_ok=True)
-            audio_opts = get_ydl_opts({
-                'format': 'bestaudio[ext=m4a]/bestaudio/best',
-                'outtmpl': 'downloads/%(id)s.%(ext)s',
-            })
-            
-            with yt_dlp.YoutubeDL(audio_opts) as ydl:
-                info = ydl.extract_info(url, download=True)
-                audio_file = ydl.prepare_filename(info)
+        status_msg = await query.message.reply_text(f"📥 در حال دانلود فایل صوتی: *{song_title[:30]}*...", parse_mode="Markdown")
+        
+        os.makedirs('downloads', exist_ok=True)
+        audio_file = None
+        success = False
 
-            if os.path.exists(audio_file):
+        # لیست منابع دانلودی برای اطمینان از دانلود ۱۰۰٪ روی Render
+        sources_to_try = []
+        if target_url:
+            sources_to_try.append(target_url)
+        sources_to_try.append(f"scsearch1:{song_title}")
+        sources_to_try.append(f"ytsearch1:{song_title}")
+
+        for source in sources_to_try:
+            try:
+                audio_opts = get_ydl_opts({
+                    'format': 'bestaudio/best',
+                    'outtmpl': 'downloads/%(id)s.%(ext)s',
+                })
+                with yt_dlp.YoutubeDL(audio_opts) as ydl:
+                    info = ydl.extract_info(source, download=True)
+                    if 'entries' in info and info['entries']:
+                        info = info['entries'][0]
+                    audio_file = ydl.prepare_filename(info)
+
+                if audio_file and os.path.exists(audio_file):
+                    success = True
+                    break
+            except Exception as e:
+                logger.error(f"Failed downloading from {source}: {e}")
+                continue
+
+        if success and audio_file and os.path.exists(audio_file):
+            try:
                 with open(audio_file, 'rb') as audio:
                     await query.message.reply_audio(
                         audio=audio,
-                        caption=f"🎵 **{title}**\n✨ فایل صوتی کامل",
+                        caption=f"🎵 **{song_title}**\n✨ دانلود شده توسط ربات",
                         parse_mode="Markdown"
                     )
                 os.remove(audio_file)
-            else:
-                await query.message.reply_text("❌ خطا در آماده‌سازی فایل صوتی.")
-
-        except Exception as e:
-            logger.error(e)
-            await query.message.reply_text("❌ خطا در دانلود فایل.")
-
-    # ۳. دکمه متن ترانه
-    elif data.startswith("lyrics_"):
-        await query.message.reply_text("📄 قابلیت نمایش متن ترانه برای این قطعه در حال حاضر در دست توسعه است.")
+                await status_msg.delete()
+            except Exception as send_err:
+                logger.error(f"Send audio error: {send_err}")
+                await status_msg.edit_text("❌ خطا در ارسال فایل صوتی به تلگرام.")
+        else:
+            await status_msg.edit_text("❌ دانلود این موزیک روی سرور با مشکل مواجه شد. لطفاً نام دیگری را امتحان کنید.")
 
 def main():
-    # استارت سرور Keep-Alive برای روشن ماندن ۲۴ ساعته در رندر
     threading.Thread(target=run_keep_alive, daemon=True).start()
 
     application = Application.builder().token(TELEGRAM_TOKEN).build()
-
     application.add_handler(CommandHandler("start", start))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     application.add_handler(CallbackQueryHandler(button_handler))
 
-    print("WhatsMusic Bot Clone is running successfully...")
+    print("WhatsMusic Bot Clone is running...")
     application.run_polling(drop_pending_updates=True)
 
 if __name__ == '__main__':
