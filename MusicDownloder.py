@@ -51,11 +51,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 title = info.get('title', 'موزیک ویدیو')
 
             if os.path.exists(video_file):
-                # ذخیره لینک و عنوان ویدیو در حافظه موقت با یک شناسهتا
                 uid = str(uuid.uuid4())[:8]
                 link_store[uid] = {'url': text, 'title': title}
 
-                # ایجاد دکمه شیشه‌ای زیر ویدیو
                 keyboard = [[InlineKeyboardButton("🎵 دریافت موزیک کامل به همراه متن", callback_data=f"aud_{uid}")]]
                 reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -93,7 +91,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.reply_text(f"🔍 در حال جستجوی نسخه کامل و متن آهنگ: *{title}*...", parse_mode="Markdown")
         
         try:
-            # ۱. جستجوی نسخه کامل و باکیفیت آهنگ در یوتیوب بر اساس نام ویدیو (به جای خود لینک کلیپ)
             search_query = f"ytsearch1:{title}"
             ydl_opts = {
                 'format': 'bestaudio/best',
@@ -110,7 +107,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 filename = ydl.prepare_filename(info)
                 audio_file = os.path.splitext(filename)[0] + ".mp3"
 
-            # ۲. پیدا کردن متن کامل ترانه از Genius بر اساس عنوان
             song = genius.search_song(song_title)
             lyrics_text = ""
             if song and song.lyrics:
@@ -118,9 +114,33 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             else:
                 lyrics_text = "\n\n⚠️ متن این آهنگ در پایگاه داده یافت نشد."
 
-            # ۳. ارسال فایل صوتی کامل به همراه متن
             if os.path.exists(audio_file):
                 caption_text = f"🎵 **{song_title}**{lyrics_text}"
                 
-                if len(caption_text) > 1024:
-                    with open(
+                with open(audio_file, 'rb') as audio:
+                    if len(caption_text) > 1024:
+                        await query.message.reply_audio(audio, caption=f"🎵 {song_title}")
+                        await query.message.reply_text(lyrics_text, parse_mode="Markdown")
+                    else:
+                        await query.message.reply_audio(audio, caption=caption_text, parse_mode="Markdown")
+                
+                os.remove(audio_file)
+            else:
+                await query.message.reply_text("❌ خطا در آماده‌سازی فایل صوتی.")
+
+        except Exception as e:
+            logger.error(e)
+            await query.message.reply_text("❌ خطایی در پردازش صوت و متن رخ داد.")
+
+def main():
+    application = Application.builder().token(TELEGRAM_TOKEN).build()
+
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    application.add_handler(CallbackQueryHandler(button_handler))
+
+    print("Advanced Bot is starting...")
+    application.run_polling()
+
+if __name__ == '__main__':
+    main()
