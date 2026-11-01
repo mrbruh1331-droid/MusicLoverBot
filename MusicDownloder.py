@@ -1,9 +1,3 @@
-دستورات شما کاملاً واضح و منطقی است. در این نسخه جدید، دقیقاً همین منطق را پیاده‌سازی کردم:
- * ارسال لینک (از هر پلتفرمی مثل یوتیوب، اینستاگرام، تیک‌تاک و...): ربات پلتفرم را بررسی می‌کند، ویدیو را به صورت استاندارد و بومی خودِ پلتفرم دانلود و ارسال می‌کند و زیر آن دکمه «🎵 دانلود آهنگ» را قرار می‌دهد.
- * درخواست آهنگ یا کلیک روی دکمه آهنگ (جستجوی نام آهنگ یا انتخاب از لیست خواننده): ربات آهنگ مورد نظر را با فرمت MP4 دانلود کرده و ارسال می‌کند.
- * پایداری صددرصدی روی رندر: سرور ضدخواب (Keep-Alive) فعال است تا ربات ۲۴ ساعته روشن بماند و دکمه‌ها و لینک‌ها هرگز منقضی نشوند.
-کد کامل، بهینه‌شده و دقیق ربات (MusicDownloder.py)
-این کد را به صورت کامل جایگزین محتوای قبلی در گیت‌هاب کنید:
 import os
 import logging
 import uuid
@@ -83,10 +77,10 @@ def get_ydl_opts(extra_opts=None):
 # دستور استارت
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     welcome_text = (
-        "✨ **به ربات هوشمند دانلود موزیک و ویدیو خوش آمدید!** 🎵🎬\n\n"
+        "✨ **به ربات حرفه‌ای دانلود موزیک و ویدیو خوش آمدید!** 🎵🎬\n\n"
         "🌐 **امکانات ربات:**\n"
-        " 🔗 **ارسال لینک:** تشخیص خودکار پلتفرم، دانلود ویدیو و ارسال دکمه **🎵 دانلود آهنگ**.\n"
-        " 🎵 **ارسال نام آهنگ / خواننده:** جستجوی سراسری و ارسال خروجی به صورت فایل **MP4**.\n\n"
+        " 🔗 **ارسال لینک:** تشخیص خودکار پلتفرم، دانلود ویدیو همراه با دکمه **🎵 دانلود آهنگ**.\n"
+        " 🎵 **ارسال نام آهنگ / خواننده:** جستجوی هوشمند و ارسال مستقیم فایل موسیقی کامل (مثل WhatsMusic).\n\n"
         "👇 *لینک یا نام مورد نظرتان را بفرستید!*"
     )
     await update.message.reply_text(welcome_text, parse_mode="Markdown")
@@ -104,7 +98,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 info = ydl.extract_info(text, download=False)
                 title = info.get('title', 'محتوا')
                 
-            # دانلود ویدیو به صورت بوی و استاندارد پلتفرم مربوطه
+            # دانلود ویدیو به صورت بومی و استاندارد پلتفرم مربوطه
             video_opts = get_ydl_opts({
                 'format': 'best/bestvideo+bestaudio',
                 'outtmpl': 'downloads/%(id)s.%(ext)s',
@@ -118,13 +112,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 storage[uid] = {'url': text, 'title': title}
                 save_storage(storage)
 
-                keyboard = [[InlineKeyboardButton("🎵 دانلود آهنگ", callback_data=f"aud_{uid}")]]
+                keyboard = [[InlineKeyboardButton("🎵 دانلود آهنگ این ویدیو", callback_data=f"aud_{uid}")]]
                 reply_markup = InlineKeyboardMarkup(keyboard)
 
                 with open(video_file, 'rb') as vid:
                     await update.message.reply_video(
                         video=vid,
-                        caption=f"🎬 **{title}**\n\n👇 برای دریافت فایل صوتی/آهنگ به صورت MP4 روی دکمه زیر کلیک کنید:",
+                        caption=f"🎬 **{title}**\n\n👇 برای دریافت فایل صوتی کامل این اثر روی دکمه زیر کلیک کنید:",
                         parse_mode="Markdown",
                         reply_markup=reply_markup
                     )
@@ -137,21 +131,29 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             logger.error(e)
             await status_msg.edit_text("❌ خطا در پردازش لینک. لطفاً لینک معتبر بفرستید.")
     
-    # حالت دوم: اگر کاربر نام آهنگ یا خواننده فرستاد (جستجوی سراسری)
+    # حالت دوم: اگر کاربر نام آهنگ یا خواننده فرستاد (جستجوی سراسری برای دریافت فایل صوتی)
     else:
         status_msg = await update.message.reply_text(f"🔍 در حال جستجوی آثار برای: *{text}*...", parse_mode="Markdown")
         try:
-            search_query = f"ytsearch15:{text}"
-            with yt_dlp.YoutubeDL(get_ydl_opts({'extract_flat': True})) as ydl:
-                info = ydl.extract_info(search_query, download=False)
-                entries = info.get('entries', [])
+            search_queries = [f"ytsearch15:{text}", f"scsearch15:{text}"]
+            entries = []
+            
+            for sq in search_queries:
+                try:
+                    with yt_dlp.YoutubeDL(get_ydl_opts({'extract_flat': True})) as ydl:
+                        info = ydl.extract_info(sq, download=False)
+                        if info and 'entries' in info:
+                            entries.extend(info['entries'])
+                except Exception as sub_e:
+                    logger.error(f"Search query {sq} failed: {sub_e}")
+                    continue
 
             if not entries:
                 await status_msg.edit_text("❌ متأسفانه هیچ نتیجه‌ای پیدا نشد.")
                 return
 
             keyboard = []
-            for entry in entries:
+            for entry in entries[:15]:
                 video_title = entry.get('title', 'آهنگ بدون عنوان')
                 video_id = entry.get('id', '')
                 if not video_id:
@@ -168,47 +170,47 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             logger.error(e)
             await status_msg.edit_text("❌ خطایی در جستجو رخ داد.")
 
-# مدیریت دکمه‌های شیشه‌ای (دانلود آهنگ به صورت MP4)
+# مدیریت دکمه‌های شیشه‌ای (دانلود و ارسال فایل صوتی کامل)
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     data = query.data
 
-    # ۱. انتخاب آهنگ از لیست جستجوی نام خواننده/آهنگ (دانلود به صورت MP4)
+    # ۱. انتخاب آهنگ از لیست جستجوی نام خواننده/آهنگ (دانلود و ارسال به صورت فایل صوتی)
     if data.startswith("ytid_"):
         video_id = data.replace("ytid_", "")
         url = f"https://www.youtube.com/watch?v={video_id}"
         
-        await query.message.reply_text("📥 در حال دانلود و ارسال آهنگ به صورت فایل MP4...", parse_mode="Markdown")
+        await query.message.reply_text("📥 در حال دانلود و ارسال فایل موسیقی کامل...", parse_mode="Markdown")
         
         try:
             os.makedirs('downloads', exist_ok=True)
-            mp4_opts = get_ydl_opts({
-                'format': 'best[ext=mp4]/best',
+            audio_opts = get_ydl_opts({
+                'format': 'bestaudio[ext=m4a]/bestaudio/best',
                 'outtmpl': 'downloads/%(id)s.%(ext)s',
             })
             
-            with yt_dlp.YoutubeDL(mp4_opts) as ydl:
+            with yt_dlp.YoutubeDL(audio_opts) as ydl:
                 info = ydl.extract_info(url, download=True)
                 title = info.get('title', 'موزیک')
-                mp4_file = ydl.prepare_filename(info)
+                audio_file = ydl.prepare_filename(info)
 
-            if os.path.exists(mp4_file):
-                with open(mp4_file, 'rb') as vid:
-                    await query.message.reply_video(
-                        video=vid,
-                        caption=f"🎵 **{title}**\n✨ فایل MP4",
+            if os.path.exists(audio_file):
+                with open(audio_file, 'rb') as audio:
+                    await query.message.reply_audio(
+                        audio=audio,
+                        caption=f"🎵 **{title}**\n✨ فایل موسیقی کامل",
                         parse_mode="Markdown"
                     )
-                os.remove(mp4_file)
+                os.remove(audio_file)
             else:
-                await query.message.reply_text("❌ خطا در آماده‌سازی فایل MP4.")
+                await query.message.reply_text("❌ خطا در آماده‌سازی فایل صوتی.")
 
         except Exception as e:
             logger.error(e)
-            await query.message.reply_text("❌ خطا در دانلود فایل.")
+            await query.message.reply_text("❌ خطا در دانلود فایل موسیقی.")
 
-    # ۲. کلیک روی دکمه «دانلود آهنگ» زیر ویدیوهای ارسالی (دانلود به صورت MP4)
+    # ۲. کلیک روی دکمه «دانلود آهنگ» زیر ویدیوهای ارسالی (استخراج و ارسال فایل صوتی کامل از ویدیو)
     elif data.startswith("aud_"):
         uid = data.replace("aud_", "")
         item = storage.get(uid)
@@ -218,33 +220,33 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         url = item['url']
         title = item['title']
-        await query.message.reply_text(f"📥 در حال دانلود و ارسال آهنگ این ویدیو به صورت MP4...", parse_mode="Markdown")
+        await query.message.reply_text(f"📥 در حال استخراج و ارسال فایل موسیقی این ویدیو...", parse_mode="Markdown")
         
         try:
             os.makedirs('downloads', exist_ok=True)
-            mp4_opts = get_ydl_opts({
-                'format': 'best[ext=mp4]/best',
+            audio_opts = get_ydl_opts({
+                'format': 'bestaudio[ext=m4a]/bestaudio/best',
                 'outtmpl': 'downloads/%(id)s.%(ext)s',
             })
             
-            with yt_dlp.YoutubeDL(mp4_opts) as ydl:
+            with yt_dlp.YoutubeDL(audio_opts) as ydl:
                 info = ydl.extract_info(url, download=True)
-                mp4_file = ydl.prepare_filename(info)
+                audio_file = ydl.prepare_filename(info)
 
-            if os.path.exists(mp4_file):
-                with open(mp4_file, 'rb') as vid:
-                    await query.message.reply_video(
-                        video=vid,
-                        caption=f"🎵 **{title}**\n✨ فایل MP4 آهنگ",
+            if os.path.exists(audio_file):
+                with open(audio_file, 'rb') as audio:
+                    await query.message.reply_audio(
+                        audio=audio,
+                        caption=f"🎵 **{title}**\n✨ فایل موسیقی کامل",
                         parse_mode="Markdown"
                     )
-                os.remove(mp4_file)
+                os.remove(audio_file)
             else:
-                await query.message.reply_text("❌ خطا در آماده‌سازی فایل MP4.")
+                await query.message.reply_text("❌ خطا در آماده‌سازی فایل صوتی.")
 
         except Exception as e:
             logger.error(e)
-            await query.message.reply_text("❌ خطا در دانلود آهنگ از ویدیو.")
+            await query.message.reply_text("❌ خطا در دانلود موسیقی از ویدیو.")
 
 def main():
     # استارت سرور Keep-Alive در پس‌زمینه برای جلوگیری از خاموشی در رندر
@@ -256,9 +258,8 @@ def main():
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     application.add_handler(CallbackQueryHandler(button_handler))
 
-    print("Smart Multi-Platform Bot with Keep-Alive is running successfully...")
+    print("WhatsMusic Style Bot with Keep-Alive is running successfully...")
     application.run_polling(drop_pending_updates=True)
 
 if __name__ == '__main__':
     main()
-
