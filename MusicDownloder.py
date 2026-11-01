@@ -37,7 +37,7 @@ def save_storage(data):
 
 storage = load_storage()
 
-# تنظیمات پیشرفته و ضدبلاک برای عبور از محدودیت‌ها
+# تنظیمات ضدبلاک و پیشرفته برای عبور از محدودیت‌های سرور
 def get_ydl_opts(extra_opts=None):
     opts = {
         'noplaylist': True,
@@ -64,7 +64,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     welcome_text = (
         "✨ **به ربات هوشمند و چندپلتفرمی دانلود موزیک و ویدیو خوش آمدید!** 🎵\n\n"
         "🌐 **امکانات ربات:**\n"
-        " 🎬 **ارسال لینک:** دانلود ویدیو از هر پلتفرمی (اینستاگرام، یوتیوب، تیک‌تاک و...) همراه با دکمه دانلود آهنگ.\n"
+        " 🎬 **ارسال لینک:** دانلود ویدیو از هر پلتفرمی همراه با دکمه دانلود آهنگ.\n"
         " 🔍 **جستجوی هوشمند:** جستجوی هم‌زمان در تمام پلتفرم‌ها (YouTube, SoundCloud و...) با ارسال نام خواننده یا آهنگ.\n\n"
         "👇 *همین حالا لینک یا نام خواننده/آهنگ مورد نظرتان را بفرستید!*"
     )
@@ -119,7 +119,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         status_msg = await update.message.reply_text(f"🔍 در حال جستجوی سراسری در پلتفرم‌ها برای: *{text}*...", parse_mode="Markdown")
         try:
-            # جستجوی هم‌زمان در یوتیوب و ساندکلاد
             search_queries = [f"ytsearch10:{text}", f"scsearch10:{text}"]
             entries = []
             
@@ -140,7 +139,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             keyboard = []
             for entry in entries[:15]:
                 video_title = entry.get('title', 'آهنگ بدون عنوان')
-                # ذخیره امن عنوان و عبارت جستجو برای دانلود از بهترین منبع
                 uid = str(uuid.uuid4())[:8]
                 storage[uid] = {'title': video_title, 'query': video_title}
                 save_storage(storage)
@@ -155,7 +153,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             logger.error(e)
             await status_msg.edit_text("❌ خطایی در جستجو رخ داد.")
 
-# مدیریت دکمه‌های شیشه‌ای (دانلود هوشمند و بررسی همه پلتفرم‌ها)
+# مدیریت دکمه‌های شیشه‌ای (دانلود هوشمند و بررسی همه پلتفرم‌ها به صورت انعطاف‌پذیر)
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -172,7 +170,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         song_title = item['query']
         await query.message.reply_text(f"🎵 در حال بررسی تمام پلتفرم‌ها و دانلود آهنگ: *{song_title[:30]}*...", parse_mode="Markdown")
         
-        # لیست پلتفرم‌هایی که به ترتیب برای دانلود چک می‌شوند
+        # پلتفرم‌های جایگزین برای دانلود موفق بدون نیاز به FFmpeg
         platforms_to_check = [
             f"ytsearch1:{song_title}",
             f"scsearch1:{song_title}"
@@ -185,8 +183,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         for platform_query in platforms_to_check:
             try:
+                # استفاده از فرمت انعطاف‌پذیر 'bestaudio/best' برای جلوگیری از خطای ناسگاری فرمت
                 audio_opts = get_ydl_opts({
-                    'format': 'bestaudio[ext=m4a]/bestaudio/best',
+                    'format': 'bestaudio/best',
                     'outtmpl': 'downloads/%(id)s.%(ext)s',
                 })
                 
@@ -227,7 +226,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             os.makedirs('downloads', exist_ok=True)
             audio_opts = get_ydl_opts({
-                'format': 'bestaudio[ext=m4a]/bestaudio/best',
+                'format': 'bestaudio/best',
                 'outtmpl': 'downloads/%(id)s.%(ext)s',
             })
             
