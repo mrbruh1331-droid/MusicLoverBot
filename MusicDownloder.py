@@ -37,7 +37,7 @@ def save_storage(data):
 
 storage = load_storage()
 
-# تنظیمات عمومی و ضدبلاک برای پشتیبانی از تمام پلتفرم‌ها
+# تنظیمات پیشرفته و جهانی برای پشتیبانی از تمام پلتفرم‌ها با بالاترین کیفیت
 def get_ydl_opts(extra_opts=None):
     opts = {
         'noplaylist': True,
@@ -57,31 +57,32 @@ def get_ydl_opts(extra_opts=None):
 # دستور استارت
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     welcome_text = (
-        "✨ **به ربات جامع و هوشمند دانلود موسیقی و ویدیو خوش آمدید!** 🎵\n\n"
-        "🌐 **پشتیبانی از تمامی پلتفرم‌ها:**\n"
-        " یوتیوب، اینستاگرام، تیک‌تاک، ساندکلاد، فیسبوک، توییتر و...\n\n"
-        "🚀 **امکانات ربات:**\n"
-        " 🎬 **ارسال لینک:** دریافت ویدیو همراه با دکمه شیشه‌ای **🎵 دانلود آهنگ**.\n"
-        " 🔍 **جستجوی موزیک:** ارسال نام خواننده یا آهنگ برای دریافت لیست نتایج جامع و دانلود.\n\n"
-        "👇 *همین حالا لینک یا نام آهنگ/خواننده مورد نظرتان را بفرستید!*"
+        "✨ **به ربات حرفه‌ای دانلود موزیک و ویدیو خوش آمدید!** 🎵\n\n"
+        "🌐 **پشتیبانی جامع از تمام پلتفرم‌ها:**\n"
+        " یوتیوب، اینستاگرام، تیک‌تاک، ساندکلاد، فیسبوک، اسپاتیفای و...\n\n"
+        "🚀 **امکانات:**\n"
+        " 🎬 **ارسال لینک:** دریافت ویدیو/محتوا با بالاترین کیفیت و دکمه دانلود آهنگ.\n"
+        " 🔍 **جستجوی خواننده/آهنگ:** دریافت کامل‌ترین لیست آثار با بالاترین کیفیت صدا (320kbps).\n\n"
+        "👇 *لینک یا نام خواننده مورد نظرتان را بفرستید!*"
     )
     await update.message.reply_text(welcome_text, parse_mode="Markdown")
 
-# مدیریت پیام‌ها
+# مدیریت پیام‌ها و لینک‌ها از هر پلتفرمی
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     os.makedirs('downloads', exist_ok=True)
 
-    # حالت اول: ارسال لینک از هر پلتفرمی
+    # اگر کاربر لینک فرستاد (از هر پلتفرمی)
     if text.startswith("http://") or text.startswith("https://"):
-        status_msg = await update.message.reply_text("📥 در حال پردازش لینک از پلتفرم مربوطه...")
+        status_msg = await update.message.reply_text("📥 در حال پردازش لینک از پلتفرم مربوطه با بالاترین کیفیت...")
         try:
             with yt_dlp.YoutubeDL(get_ydl_opts()) as ydl:
                 info = ydl.extract_info(text, download=False)
                 title = info.get('title', 'موزیک / ویدیو')
                 
+            # دانلود رسانه با بهترین کیفیت ممکن در سطح پلتفرم
             video_opts = get_ydl_opts({
-                'format': 'best[ext=mp4]/best/bestvideo+bestaudio/best',
+                'format': 'bestvideo+bestaudio/best/best',
                 'outtmpl': 'downloads/%(id)s.%(ext)s',
             })
             with yt_dlp.YoutubeDL(video_opts) as ydl:
@@ -93,10 +94,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 storage[uid] = {'url': text, 'title': title}
                 save_storage(storage)
 
-                keyboard = [[InlineKeyboardButton("🎵 دانلود آهنگ", callback_data=f"aud_{uid}")]]
+                keyboard = [[InlineKeyboardButton("🎵 دانلود آهنگ با بهترین کیفیت", callback_data=f"aud_{uid}")]]
                 reply_markup = InlineKeyboardMarkup(keyboard)
 
-                if video_file.endswith(('.mp3', '.m4a', '.webm', '.opus', '.wav')):
+                if video_file.endswith(('.mp3', '.m4a', '.webm', '.opus', '.wav', '.flac')):
                     with open(video_file, 'rb') as audio:
                         await update.message.reply_audio(audio, caption=f"🎵 **{title}**", parse_mode="Markdown")
                     os.remove(video_file)
@@ -104,7 +105,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     with open(video_file, 'rb') as vid:
                         await update.message.reply_video(
                             vid,
-                            caption=f"🎬 **{title}**\n\n👇 برای دریافت فایل صوتی این اثر روی دکمه زیر کلیک کنید:",
+                            caption=f"🎬 **{title}**\n\n👇 برای دریافت فایل صوتی با کیفیت عالی روی دکمه زیر کلیک کنید:",
                             parse_mode="Markdown",
                             reply_markup=reply_markup
                         )
@@ -115,9 +116,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         except Exception as e:
             logger.error(e)
-            await status_msg.edit_text("❌ خطا در پردازش لینک. لطفاً از پلتفرم دیگری امتحان کنید.")
+            await status_msg.edit_text("❌ خطا در پردازش لینک. لطفاً بررسی کنید.")
     
-    # حالت دوم: جستجوی نام آهنگ یا خواننده (دریافت 20 نتیجه برتر)
+    # اگر کاربر نام خواننده یا آهنگ فرستاد (جستجوی سراسری برای یافتن بهترین نتیجه‌ها)
     else:
         status_msg = await update.message.reply_text(f"🔍 در حال جستجوی آثار: *{text}*...", parse_mode="Markdown")
         try:
@@ -127,7 +128,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 entries = info.get('entries', [])
 
             if not entries:
-                await status_msg.edit_text("❌ متأسفانه هیچ نتیجه‌ای پیدا نشد. لطفاً عبارت دیگری را امتحان کنید.")
+                await status_msg.edit_text("❌ متأسفانه هیچ نتیجه‌ای پیدا نشد.")
                 return
 
             keyboard = []
@@ -141,13 +142,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 keyboard.append([InlineKeyboardButton(button_text, callback_data=f"ytid_{video_id}")])
 
             reply_markup = InlineKeyboardMarkup(keyboard)
-            await status_msg.edit_text("✨ **لیست کامل نتایج جستجو آماده است:**\n👇 آهنگ مورد نظر خود را انتخاب کنید:", reply_markup=reply_markup, parse_mode="Markdown")
+            await status_msg.edit_text("✨ **لیست نتایج آماده است:**\n👇 آهنگ مورد نظر خود را انتخاب کنید:", reply_markup=reply_markup, parse_mode="Markdown")
 
         except Exception as e:
             logger.error(e)
             await status_msg.edit_text("❌ خطایی در جستجو رخ داد.")
 
-# مدیریت دکمه‌های شیشه‌ای
+# پردازش دکمه‌های شیشه‌ای برای دانلود صوت با بالاترین کیفیت (320kbps)
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -157,13 +158,18 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         video_id = data.replace("ytid_", "")
         url = f"https://www.youtube.com/watch?v={video_id}"
         
-        await query.message.reply_text("🎵 در حال دانلود صوت از یوتیوب...", parse_mode="Markdown")
+        await query.message.reply_text("🎵 در حال استخراج و دانلود صوت با **بالاترین کیفیت (320kbps)**...", parse_mode="Markdown")
         
         try:
             os.makedirs('downloads', exist_ok=True)
+            # تنظیم کیفیت صوتی روی بالاترین بیت‌ریت (320)
             audio_opts = get_ydl_opts({
                 'format': 'bestaudio/best',
-                'postprocessors': [{'key': 'FFmpegExtractAudio', 'preferredcodec': 'mp3', 'preferredquality': '192'}],
+                'postprocessors': [{
+                    'key': 'FFmpegExtractAudio',
+                    'preferredcodec': 'mp3',
+                    'preferredquality': '320',
+                }],
                 'outtmpl': 'downloads/%(id)s.%(ext)s',
             })
             
@@ -174,10 +180,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             if os.path.exists(audio_file):
                 with open(audio_file, 'rb') as audio:
-                    await query.message.reply_audio(audio, caption=f"🎵 **{title}**", parse_mode="Markdown")
+                    await query.message.reply_audio(audio, caption=f"🎵 **{title}**\n✨ کیفیت: 320kbps", parse_mode="Markdown")
                 os.remove(audio_file)
             else:
-                await query.message.reply_text("❌ خطا در آماده‌سازی فایل صوتی.")
+                await query.message.reply_text("❌ خطا در آماده‌سازی فایل صوتی با کیفیت بالا.")
 
         except Exception as e:
             logger.error(e)
@@ -187,18 +193,22 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         uid = data.replace("aud_", "")
         item = storage.get(uid)
         if not item:
-            await query.message.reply_text("❌ اطلاعات لینک منقضی شده است. لطفاً لینک را دوباره بفرستید.")
+            await query.message.reply_text("❌ اطلاعات لینک منقضی شده است. لطفاً دوباره تلاش کنید.")
             return
 
         url = item['url']
         title = item['title']
-        await query.message.reply_text(f"🎵 در حال دانلود صوت: *{title[:30]}*...", parse_mode="Markdown")
+        await query.message.reply_text(f"🎵 در حال دانلود صوت با **بالاترین کیفیت**: *{title[:30]}*...", parse_mode="Markdown")
         
         try:
             os.makedirs('downloads', exist_ok=True)
             audio_opts = get_ydl_opts({
                 'format': 'bestaudio/best',
-                'postprocessors': [{'key': 'FFmpegExtractAudio', 'preferredcodec': 'mp3', 'preferredquality': '192'}],
+                'postprocessors': [{
+                    'key': 'FFmpegExtractAudio',
+                    'preferredcodec': 'mp3',
+                    'preferredquality': '320',
+                }],
                 'outtmpl': 'downloads/%(id)s.%(ext)s',
             })
             
@@ -209,7 +219,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             if os.path.exists(audio_file):
                 with open(audio_file, 'rb') as audio:
-                    await query.message.reply_audio(audio, caption=f"🎵 **{title}**", parse_mode="Markdown")
+                    await query.message.reply_audio(audio, caption=f"🎵 **{title}**\n✨ کیفیت: 320kbps", parse_mode="Markdown")
                 os.remove(audio_file)
             else:
                 await query.message.reply_text("❌ خطا در آماده‌سازی فایل صوتی.")
@@ -225,7 +235,7 @@ def main():
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     application.add_handler(CallbackQueryHandler(button_handler))
 
-    print("Universal Music Bot is running successfully...")
+    print("Universal High-Quality Music Bot is running successfully...")
     application.run_polling(drop_pending_updates=True)
 
 if __name__ == '__main__':
