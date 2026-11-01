@@ -37,7 +37,7 @@ def save_storage(data):
 
 storage = load_storage()
 
-# تنظیمات ضدبلاک و پیشرفته برای عبور از محدودیت‌های سرور
+# تنظیمات پیشرفته و ضدبلاک برای عبور از محدودیت‌ها
 def get_ydl_opts(extra_opts=None):
     opts = {
         'noplaylist': True,
@@ -64,7 +64,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     welcome_text = (
         "✨ **به ربات هوشمند و چندپلتفرمی دانلود موزیک و ویدیو خوش آمدید!** 🎵\n\n"
         "🌐 **امکانات ربات:**\n"
-        " 🎬 **ارسال لینک:** دانلود ویدیو از هر پلتفرمی همراه با دکمه دانلود آهنگ.\n"
+        " 🎬 **ارسال لینک:** دانلود ویدیو از هر پلتفرمی همراه با دکمه دریافت فایل صوتی.\n"
         " 🔍 **جستجوی هوشمند:** جستجوی هم‌زمان در تمام پلتفرم‌ها (YouTube, SoundCloud و...) با ارسال نام خواننده یا آهنگ.\n\n"
         "👇 *همین حالا لینک یا نام خواننده/آهنگ مورد نظرتان را بفرستید!*"
     )
@@ -96,7 +96,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 storage[uid] = {'url': text, 'title': title}
                 save_storage(storage)
 
-                keyboard = [[InlineKeyboardButton("🎵 دانلود آهنگ این ویدیو", callback_data=f"aud_{uid}")]]
+                keyboard = [[InlineKeyboardButton("🎵 دانلود فایل صوتی این ویدیو", callback_data=f"aud_{uid}")]]
                 reply_markup = InlineKeyboardMarkup(keyboard)
 
                 with open(video_file, 'rb') as vid:
@@ -153,7 +153,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             logger.error(e)
             await status_msg.edit_text("❌ خطایی در جستجو رخ داد.")
 
-# مدیریت دکمه‌های شیشه‌ای (دانلود هوشمند و بررسی همه پلتفرم‌ها به صورت انعطاف‌پذیر)
+# مدیریت دکمه‌های شیشه‌ای (ارسال آهنگ به عنوان فایل سند / Document)
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -168,9 +168,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
         song_title = item['query']
-        await query.message.reply_text(f"🎵 در حال بررسی تمام پلتفرم‌ها و دانلود آهنگ: *{song_title[:30]}*...", parse_mode="Markdown")
+        await query.message.reply_text(f"🎵 در حال بررسی تمام پلتفرم‌ها و آماده‌سازی فایل صوتی: *{song_title[:30]}*...", parse_mode="Markdown")
         
-        # پلتفرم‌های جایگزین برای دانلود موفق بدون نیاز به FFmpeg
         platforms_to_check = [
             f"ytsearch1:{song_title}",
             f"scsearch1:{song_title}"
@@ -183,7 +182,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         for platform_query in platforms_to_check:
             try:
-                # استفاده از فرمت انعطاف‌پذیر 'bestaudio/best' برای جلوگیری از خطای ناسگاری فرمت
                 audio_opts = get_ydl_opts({
                     'format': 'bestaudio/best',
                     'outtmpl': 'downloads/%(id)s.%(ext)s',
@@ -205,13 +203,18 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 continue
 
         if success and audio_file and os.path.exists(audio_file):
+            # ارسال به صورت فایل سند (Document) دقیقاً مانند ربات‌های دانلود موزیک
             with open(audio_file, 'rb') as audio:
-                await query.message.reply_audio(audio, caption=f"🎵 **{final_title}**\n✨ دانلود شده با موفقیت", parse_mode="Markdown")
+                await query.message.reply_document(
+                    document=audio,
+                    caption=f"🎵 **{final_title}**\n✨ دانلود شده با موفقیت",
+                    parse_mode="Markdown"
+                )
             os.remove(audio_file)
         else:
             await query.message.reply_text("❌ متأسفانه این آهنگ در هیچ‌کدام از پلتفرم‌ها برای دانلود در دسترس نبود.")
 
-    # ۲. دانلود از دکمه زیر لینک ویدیوهای ارسالی
+    # ۲. دانلود فایل صوتی از دکمه زیر ویدیوهای ارسالی
     elif data.startswith("aud_"):
         uid = data.replace("aud_", "")
         item = storage.get(uid)
@@ -221,7 +224,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         url = item['url']
         title = item['title']
-        await query.message.reply_text(f"🎵 در حال استخراج صوت از ویدیو...", parse_mode="Markdown")
+        await query.message.reply_text(f"🎵 در حال استخراج و ارسال فایل صوتی از ویدیو...", parse_mode="Markdown")
         
         try:
             os.makedirs('downloads', exist_ok=True)
@@ -236,7 +239,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             if os.path.exists(audio_file):
                 with open(audio_file, 'rb') as audio:
-                    await query.message.reply_audio(audio, caption=f"🎵 **{title}**", parse_mode="Markdown")
+                    await query.message.reply_document(
+                        document=audio,
+                        caption=f"🎵 **{title}**\n✨ فایل صوتی اصلی",
+                        parse_mode="Markdown"
+                    )
                 os.remove(audio_file)
             else:
                 await query.message.reply_text("❌ خطا در آماده‌سازی فایل صوتی.")
@@ -252,7 +259,7 @@ def main():
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     application.add_handler(CallbackQueryHandler(button_handler))
 
-    print("Multi-Platform Music Bot is running successfully...")
+    print("Document-based Multi-Platform Bot is running successfully...")
     application.run_polling(drop_pending_updates=True)
 
 if __name__ == '__main__':
