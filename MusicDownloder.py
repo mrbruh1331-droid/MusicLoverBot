@@ -37,18 +37,24 @@ def save_storage(data):
 
 storage = load_storage()
 
-# تنظیمات پیشرفته و جهانی برای پشتیبانی از تمام پلتفرم‌ها با بالاترین کیفیت
+# تنظیمات ضدبلاک قدرتمند برای عبور از محدودیت‌های سرور
 def get_ydl_opts(extra_opts=None):
     opts = {
         'noplaylist': True,
         'quiet': True,
+        'no_warnings': True,
+        'geo_bypass': True,
         'http_headers': {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            'Accept-Language': 'en-us,en;q=0.5',
+            'Accept-Language': 'en-US,en;q=0.5',
             'Sec-Fetch-Mode': 'navigate',
         },
-        'extractor_args': {'youtube': {'player_client': ['android', 'web']}},
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['android', 'ios', 'web']
+            }
+        },
     }
     if extra_opts:
         opts.update(extra_opts)
@@ -59,28 +65,27 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     welcome_text = (
         "✨ **به ربات حرفه‌ای دانلود موزیک و ویدیو خوش آمدید!** 🎵\n\n"
         "🌐 **پشتیبانی جامع از تمام پلتفرم‌ها:**\n"
-        " یوتیوب، اینستاگرام، تیک‌تاک، ساندکلاد، فیسبوک، اسپاتیفای و...\n\n"
+        " یوتیوب، اینستاگرام، تیک‌تاک، ساندکلاد و...\n\n"
         "🚀 **امکانات:**\n"
-        " 🎬 **ارسال لینک:** دریافت ویدیو/محتوا با بالاترین کیفیت و دکمه دانلود آهنگ.\n"
-        " 🔍 **جستجوی خواننده/آهنگ:** دریافت کامل‌ترین لیست آثار با بالاترین کیفیت صدا (320kbps).\n\n"
+        " 🎬 **ارسال لینک:** دریافت محتوا با بالاترین کیفیت.\n"
+        " 🔍 **جستجوی خواننده/آهنگ:** ارسال نام برای دریافت لیست کامل آثار و دانلود آنی.\n\n"
         "👇 *لینک یا نام خواننده مورد نظرتان را بفرستید!*"
     )
     await update.message.reply_text(welcome_text, parse_mode="Markdown")
 
-# مدیریت پیام‌ها و لینک‌ها از هر پلتفرمی
+# مدیریت پیام‌ها و لینک‌ها
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     os.makedirs('downloads', exist_ok=True)
 
-    # اگر کاربر لینک فرستاد (از هر پلتفرمی)
+    # اگر کاربر لینک فرستاد
     if text.startswith("http://") or text.startswith("https://"):
-        status_msg = await update.message.reply_text("📥 در حال پردازش لینک از پلتفرم مربوطه با بالاترین کیفیت...")
+        status_msg = await update.message.reply_text("📥 در حال پردازش لینک از پلتفرم مربوطه...")
         try:
             with yt_dlp.YoutubeDL(get_ydl_opts()) as ydl:
                 info = ydl.extract_info(text, download=False)
                 title = info.get('title', 'موزیک / ویدیو')
                 
-            # دانلود رسانه با بهترین کیفیت ممکن در سطح پلتفرم
             video_opts = get_ydl_opts({
                 'format': 'bestvideo+bestaudio/best/best',
                 'outtmpl': 'downloads/%(id)s.%(ext)s',
@@ -105,7 +110,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     with open(video_file, 'rb') as vid:
                         await update.message.reply_video(
                             vid,
-                            caption=f"🎬 **{title}**\n\n👇 برای دریافت فایل صوتی با کیفیت عالی روی دکمه زیر کلیک کنید:",
+                            caption=f"🎬 **{title}**\n\n👇 برای دریافت فایل صوتی روی دکمه زیر کلیک کنید:",
                             parse_mode="Markdown",
                             reply_markup=reply_markup
                         )
@@ -116,9 +121,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         except Exception as e:
             logger.error(e)
-            await status_msg.edit_text("❌ خطا در پردازش لینک. لطفاً بررسی کنید.")
+            await status_msg.edit_text("❌ خطا در پردازش لینک.")
     
-    # اگر کاربر نام خواننده یا آهنگ فرستاد (جستجوی سراسری برای یافتن بهترین نتیجه‌ها)
+    # اگر کاربر نام خواننده یا آهنگ فرستاد (جستجوی سراسری)
     else:
         status_msg = await update.message.reply_text(f"🔍 در حال جستجوی آثار: *{text}*...", parse_mode="Markdown")
         try:
@@ -148,7 +153,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             logger.error(e)
             await status_msg.edit_text("❌ خطایی در جستجو رخ داد.")
 
-# پردازش دکمه‌های شیشه‌ای برای دانلود صوت با بالاترین کیفیت (320kbps)
+# مدیریت دکمه‌های شیشه‌ای برای دانلود صوت
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -158,47 +163,46 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         video_id = data.replace("ytid_", "")
         url = f"https://www.youtube.com/watch?v={video_id}"
         
-        await query.message.reply_text("🎵 در حال استخراج و دانلود صوت با **بالاترین کیفیت (320kbps)**...", parse_mode="Markdown")
+        await query.message.reply_text("🎵 در حال دانلود صوت با بهترین کیفیت...", parse_mode="Markdown")
         
         try:
             os.makedirs('downloads', exist_ok=True)
-            # تنظیم کیفیت صوتی روی بالاترین بیت‌ریت (320)
             audio_opts = get_ydl_opts({
                 'format': 'bestaudio/best',
                 'postprocessors': [{
                     'key': 'FFmpegExtractAudio',
                     'preferredcodec': 'mp3',
-                    'preferredquality': '320',
+                    'preferredquality': '192',
                 }],
                 'outtmpl': 'downloads/%(id)s.%(ext)s',
             })
             
             with yt_dlp.YoutubeDL(audio_opts) as ydl:
                 info = ydl.extract_info(url, download=True)
-                title = info.get('title', 'موزیک')
                 audio_file = os.path.join('downloads', f"{video_id}.mp3")
+                title = info.get('title', 'موزیک')
 
             if os.path.exists(audio_file):
                 with open(audio_file, 'rb') as audio:
-                    await query.message.reply_audio(audio, caption=f"🎵 **{title}**\n✨ کیفیت: 320kbps", parse_mode="Markdown")
+                    await query.message.reply_audio(audio, caption=f"🎵 **{title}**", parse_mode="Markdown")
                 os.remove(audio_file)
             else:
-                await query.message.reply_text("❌ خطا در آماده‌سازی فایل صوتی با کیفیت بالا.")
+                await query.message.reply_text("❌ خطا در آماده‌سازی فایل صوتی.")
 
         except Exception as e:
             logger.error(e)
-            await query.message.reply_text("❌ خطایی در دانلود موزیک رخ داد.")
+            await query.message.reply_text("❌ خطایی در دانلود موزیک رخ داد. (احتمال محدودیت موقت سرور)")
 
     elif data.startswith("aud_"):
         uid = data.replace("aud_", "")
         item = storage.get(uid)
         if not item:
-            await query.message.reply_text("❌ اطلاعات لینک منقضی شده است. لطفاً دوباره تلاش کنید.")
+            await query.message.reply_text("❌ اطلاعات لینک منقضی شده است.")
             return
 
         url = item['url']
         title = item['title']
-        await query.message.reply_text(f"🎵 در حال دانلود صوت با **بالاترین کیفیت**: *{title[:30]}*...", parse_mode="Markdown")
+        await query.message.reply_text(f"🎵 در حال دانلود صوت: *{title[:30]}*...", parse_mode="Markdown")
         
         try:
             os.makedirs('downloads', exist_ok=True)
@@ -207,7 +211,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 'postprocessors': [{
                     'key': 'FFmpegExtractAudio',
                     'preferredcodec': 'mp3',
-                    'preferredquality': '320',
+                    'preferredquality': '192',
                 }],
                 'outtmpl': 'downloads/%(id)s.%(ext)s',
             })
@@ -219,7 +223,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             if os.path.exists(audio_file):
                 with open(audio_file, 'rb') as audio:
-                    await query.message.reply_audio(audio, caption=f"🎵 **{title}**\n✨ کیفیت: 320kbps", parse_mode="Markdown")
+                    await query.message.reply_audio(audio, caption=f"🎵 **{title}**", parse_mode="Markdown")
                 os.remove(audio_file)
             else:
                 await query.message.reply_text("❌ خطا در آماده‌سازی فایل صوتی.")
@@ -235,7 +239,7 @@ def main():
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     application.add_handler(CallbackQueryHandler(button_handler))
 
-    print("Universal High-Quality Music Bot is running successfully...")
+    print("Universal Music Bot is running successfully...")
     application.run_polling(drop_pending_updates=True)
 
 if __name__ == '__main__':
