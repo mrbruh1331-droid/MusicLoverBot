@@ -37,7 +37,7 @@ def save_storage(data):
 
 storage = load_storage()
 
-# تنظیمات ضدبلاک و بهینه برای سرورهای ابری
+# تنظیمات پیشرفته و ضدبلاک (بدون نیاز به FFmpeg)
 def get_ydl_opts(extra_opts=None):
     opts = {
         'noplaylist': True,
@@ -62,11 +62,11 @@ def get_ydl_opts(extra_opts=None):
 # دستور استارت
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     welcome_text = (
-        "✨ **به ربات جامع و هوشمند دانلود موزیک و ویدیو خوش آمدید!** 🎵\n\n"
-        "🌐 **امکانات ربات:**\n"
-        " 🎬 **ارسال لینک:** دانلود ویدیو همراه با دکمه **🎵 دانلود آهنگ**.\n"
-        " 🔍 **جستجوی خواننده/آهنگ:** دریافت لیست کامل آثار و دانلود مستقیم و پرسرعت.\n\n"
-        "👇 *لینک یا نام خواننده/آهنگ مورد نظرتان را بفرستید!*"
+        "✨ **به ربات هوشمند دانلود ویدیو و موزیک خوش آمدید!** 🎵\n\n"
+        "📌 **راهنمای استفاده:**\n"
+        " 1️⃣ **ارسال لینک:** ارسال لینک ویدیو از یوتیوب، اینستاگرام و... برای دریافت ویدیو + دکمه دانلود آهنگ.\n"
+        " 2️⃣ **جستجوی آهنگ/خواننده:** ارسال نام برای دریافت لیست آثار و دانلود مستقیم آنی.\n\n"
+        "👇 *همین حالا لینک یا نام خواننده مورد نظرتان را بفرستید!*"
     )
     await update.message.reply_text(welcome_text, parse_mode="Markdown")
 
@@ -75,16 +75,16 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     os.makedirs('downloads', exist_ok=True)
 
-    # حالت اول: اگر کاربر لینک فرستاد (دانلود ویدیو + دکمه آهنگ)
+    # حالت اول: کاربر لینک ویدیو فرستاده است
     if text.startswith("http://") or text.startswith("https://"):
-        status_msg = await update.message.reply_text("📥 در حال پردازش لینک...")
+        status_msg = await update.message.reply_text("📥 در حال دانلود ویدیو از لینک ارسالی...")
         try:
             with yt_dlp.YoutubeDL(get_ydl_opts()) as ydl:
                 info = ydl.extract_info(text, download=False)
                 title = info.get('title', 'موزیک / ویدیو')
                 
             video_opts = get_ydl_opts({
-                'format': 'best/bestvideo+bestaudio',
+                'format': 'best[ext=mp4]/best/bestvideo+bestaudio',
                 'outtmpl': 'downloads/%(id)s.%(ext)s',
             })
             with yt_dlp.YoutubeDL(video_opts) as ydl:
@@ -96,26 +96,26 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 storage[uid] = {'url': text, 'title': title}
                 save_storage(storage)
 
-                keyboard = [[InlineKeyboardButton("🎵 دانلود آهنگ", callback_data=f"aud_{uid}")]]
+                keyboard = [[InlineKeyboardButton("🎵 دانلود آهنگ این ویدیو", callback_data=f"aud_{uid}")]]
                 reply_markup = InlineKeyboardMarkup(keyboard)
 
                 with open(video_file, 'rb') as vid:
                     await update.message.reply_video(
                         vid,
-                        caption=f"🎬 **{title}**\n\n👇 برای دریافت فایل صوتی روی دکمه زیر کلیک کنید:",
+                        caption=f"🎬 **{title}**\n\n👇 برای دریافت فایل صوتی این اثر روی دکمه زیر کلیک کنید:",
                         parse_mode="Markdown",
                         reply_markup=reply_markup
                     )
                 os.remove(video_file)
                 await status_msg.delete()
             else:
-                await status_msg.edit_text("❌ خطا در دانلود محتوا.")
+                await status_msg.edit_text("❌ خطا در دانلود ویدیو.")
 
         except Exception as e:
             logger.error(e)
-            await status_msg.edit_text("❌ خطا در پردازش لینک.")
+            await status_msg.edit_text("❌ خطا در پردازش لینک. لطفاً لینک معتبر ارسال کنید.")
     
-    # حالت دوم: اگر کاربر نام خواننده یا آهنگ فرستاد (جستجوی پایدار لیست آثار)
+    # حالت دوم: کاربر نام خواننده یا آهنگ فرستاده است
     else:
         status_msg = await update.message.reply_text(f"🔍 در حال جستجوی آثار: *{text}*...", parse_mode="Markdown")
         try:
@@ -145,13 +145,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             logger.error(e)
             await status_msg.edit_text("❌ خطایی در جستجو رخ داد.")
 
-# مدیریت دکمه‌های شیشه‌ای برای دانلود صوت
+# مدیریت دکمه‌های شیشه‌ای
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     data = query.data
 
-    # ۱. اگر کاربر آهنگی را از لیست جستجوی خواننده انتخاب کرد
+    # ۱. کلیک روی آهنگ از لیست جستجوی خواننده
     if data.startswith("ytid_"):
         video_id = data.replace("ytid_", "")
         url = f"https://www.youtube.com/watch?v={video_id}"
@@ -181,17 +181,17 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             logger.error(e)
             await query.message.reply_text("❌ خطا در دانلود موزیک.")
 
-    # ۲. اگر کاربر روی دکمه «دانلود آهنگ»ِ زیر ویدیوهای ارسالی کلیک کرد
+    # ۲. کلیک روی دکمه «دانلود آهنگ» زیر ویدیوهای ارسالی
     elif data.startswith("aud_"):
         uid = data.replace("aud_", "")
         item = storage.get(uid)
         if not item:
-            await query.message.reply_text("❌ اطلاعات لینک منقضی شده است.")
+            await query.message.reply_text("❌ اطلاعات لینک منقضی شده است. لطفاً لینک را دوباره بفرستید.")
             return
 
         url = item['url']
         title = item['title']
-        await query.message.reply_text(f"🎵 در حال استخراج صوت: *{title[:30]}*...", parse_mode="Markdown")
+        await query.message.reply_text(f"🎵 در حال استخراج صوت از ویدیو...", parse_mode="Markdown")
         
         try:
             os.makedirs('downloads', exist_ok=True)
@@ -213,7 +213,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         except Exception as e:
             logger.error(e)
-            await query.message.reply_text("❌ خطا در دانلود موزیک.")
+            await query.message.reply_text("❌ خطا در دانلود موزیک از ویدیو.")
 
 def main():
     application = Application.builder().token(TELEGRAM_TOKEN).build()
