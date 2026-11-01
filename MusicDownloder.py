@@ -85,45 +85,4 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 'outtmpl': 'downloads/%(id)s.%(ext)s',
             })
             with yt_dlp.YoutubeDL(video_opts) as ydl:
-                info_dl = ydl.extract_info(text, download=True)
-                video_file = ydl.prepare_filename(info_dl)
-
-            if os.path.exists(video_file):
-                uid = str(uuid.uuid4())[:8]
-                storage[uid] = {'url': text, 'title': title}
-                save_storage(storage)
-
-                keyboard = [[InlineKeyboardButton("🎵 دانلود آهنگ", callback_data=f"aud_{uid}")]]
-                reply_markup = InlineKeyboardMarkup(keyboard)
-
-                if video_file.endswith(('.mp3', '.m4a', '.webm', '.opus', '.wav')):
-                    with open(video_file, 'rb') as audio:
-                        await update.message.reply_audio(audio, caption=f"🎵 **{title}**", parse_mode="Markdown")
-                    os.remove(video_file)
-                else:
-                    with open(video_file, 'rb') as vid:
-                        await update.message.reply_video(
-                            vid,
-                            caption=f"🎬 **{title}**\n\n👇 برای دریافت فایل صوتی این اثر روی دکمه زیر کلیک کنید:",
-                            parse_mode="Markdown",
-                            reply_markup=reply_markup
-                        )
-                    os.remove(video_file)
-                await status_msg.delete()
-            else:
-                await status_msg.edit_text("❌ خطا در دانلود محتوا از لینک ارسالی.")
-
-        except Exception as e:
-            logger.error(e)
-            await status_msg.edit_text("❌ خطا در پردازش لینک. لطفاً از پلتفرم دیگری امتحان کنید.")
-    
-    # حالت دوم: جستجوی نام آهنگ یا خواننده (دریافت 20 نتیجه برتر)
-    else:
-        status_msg = await update.message.reply_text(f"🔍 در حال جستجوی آثار: *{text}*...", parse_mode="Markdown")
-        try:
-            search_query = f"ytsearch20:{text}"
-            with yt_dlp.YoutubeDL(get_ydl_opts({'extract_flat': True})) as ydl:
-                info = ydl.extract_info(search_query, download=False)
-                entries = info.get('entries', [])
-
-            if not
+                info_dl = ydl.extract_info(text
