@@ -28,7 +28,7 @@ link_store = {}
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     welcome_text = (
         "سلام! 🎵 به ربات حرفه‌ای دانلود موزیک و ویدیو خوش آمدید.\n\n"
-        "🔗 کافی است **لینک** مورد نظر خود (یوتیوب، اینستاگرام، تیک‌تاک و...) را بفرستید تا ویدیو به همراه دکمه شیشه‌ای دریافت موزیک کامل و متن برایتان ارسال شود!"
+        "🔗 کافی است **لینک** مورد نظر خود (یوتیوب، اینستاگرام، تیک‌تاک و...) را بفرستید تا ویدیو به همراه دکمه‌های جداگانه برای دریافت موزیک و متن برایتان ارسال شود!"
     )
     await update.message.reply_text(welcome_text)
 
@@ -54,13 +54,17 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 uid = str(uuid.uuid4())[:8]
                 link_store[uid] = {'url': text, 'title': title}
 
-                keyboard = [[InlineKeyboardButton("🎵 دریافت موزیک کامل به همراه متن", callback_data=f"aud_{uid}")]]
+                # ساخت دو دکمه شیشه‌ای جداگانه برای موزیک و متن
+                keyboard = [
+                    [InlineKeyboardButton("🎵 دریافت موزیک", callback_data=f"aud_{uid}")],
+                    [InlineKeyboardButton("📜 دریافت متن آهنگ", callback_data=f"lyr_{uid}")]
+                ]
                 reply_markup = InlineKeyboardMarkup(keyboard)
 
                 with open(video_file, 'rb') as vid:
                     await update.message.reply_video(
                         vid,
-                        caption=f"🎬 **{title}**\n\n👇 برای دریافت صوت کامل و متن ترانه، روی دکمه زیر کلیک کنید:",
+                        caption=f"🎬 **{title}**\n\n👇 یکی از گزینه‌های زیر را انتخاب کنید:",
                         parse_mode="Markdown",
                         reply_markup=reply_markup
                     )
@@ -80,6 +84,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     data = query.data
 
+    # اگر کاربر روی دکمه دریافت موزیک کلیک کرد
     if data.startswith("aud_"):
         uid = data.replace("aud_", "")
         stored_data = link_store.get(uid)
@@ -88,7 +93,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
         title = stored_data['title']
-        await query.message.reply_text(f"🔍 در حال جستجوی نسخه کامل و متن آهنگ: *{title}*...", parse_mode="Markdown")
+        await query.message.reply_text(f"🎵 در حال جستجو و دانلود نسخه کامل آهنگ: *{title}*...", parse_mode="Markdown")
         
         try:
             search_query = f"ytsearch1:{title}"
@@ -107,30 +112,38 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 filename = ydl.prepare_filename(info)
                 audio_file = os.path.splitext(filename)[0] + ".mp3"
 
-            song = genius.search_song(song_title)
-            lyrics_text = ""
-            if song and song.lyrics:
-                lyrics_text = f"\n\n📜 **متن ترانه:**\n\n{song.lyrics[:3000]}"
-            else:
-                lyrics_text = "\n\n⚠️ متن این آهنگ در پایگاه داده یافت نشد."
-
             if os.path.exists(audio_file):
-                caption_text = f"🎵 **{song_title}**{lyrics_text}"
-                
                 with open(audio_file, 'rb') as audio:
-                    if len(caption_text) > 1024:
-                        await query.message.reply_audio(audio, caption=f"🎵 {song_title}")
-                        await query.message.reply_text(lyrics_text, parse_mode="Markdown")
-                    else:
-                        await query.message.reply_audio(audio, caption=caption_text, parse_mode="Markdown")
-                
+                    await query.message.reply_audio(audio, caption=f"🎵 {song_title}")
                 os.remove(audio_file)
             else:
                 await query.message.reply_text("❌ خطا در آماده‌سازی فایل صوتی.")
 
         except Exception as e:
             logger.error(e)
-            await query.message.reply_text("❌ خطایی در پردازش صوت و متن رخ داد.")
+            await query.message.reply_text("❌ خطایی در دانلود موزیک رخ داد.")
+
+    # اگر کاربر روی دکمه دریافت متن آهنگ کلیک کرد
+    elif data.startswith("lyr_"):
+        uid = data.replace("lyr_", "")
+        stored_data = link_store.get(uid)
+        if not stored_data:
+            await query.message.reply_text("❌ اطلاعات لینک منقضی شده است. لطفاً دوباره لینک را ارسال کنید.")
+            return
+
+        title = stored_data['title']
+        await query.message.reply_text(f"📜 در حال جستجوی متن آهنگ: *{title}*...", parse_mode="Markdown")
+        
+        try:
+            song = genius.search_song(title)
+            if song and song.lyrics:
+                lyrics_text = song.lyrics[:4000]
+                await query.message.reply_text(f"📜 **متن ترانه ({title}):**\n\n{lyrics_text}", parse_mode="Markdown")
+            else:
+                await query.message.reply_text("❌ متأسفانه متن این آهنگ در پایگاه داده یافت نشد.")
+        except Exception as e:
+            logger.error(e)
+            await query.message.reply_text("❌ خطایی در دریافت متن رخ داد.")
 
 def main():
     application = Application.builder().token(TELEGRAM_TOKEN).build()
@@ -139,7 +152,7 @@ def main():
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     application.add_handler(CallbackQueryHandler(button_handler))
 
-    print("Advanced Bot is starting...")
+    print("Bot is starting...")
     application.run_polling()
 
 if __name__ == '__main__':
